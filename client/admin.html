@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#16a34a">
+  <meta name="description" content="Admin dashboard for attendance management and reporting">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Attendance Admin">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect fill='%2316a34a' width='192' height='192'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-size='80' font-weight='bold' fill='white' font-family='Arial'>A</text></svg>">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%2316a34a' width='100' height='100'/><text x='50' y='55' font-size='60' font-weight='bold' fill='white' text-anchor='middle'>A</text></svg>">
+  <link rel="manifest" href="/manifest.json">
+  <title>Admin Dashboard – Attendance System</title>
+  <link rel="stylesheet" href="css/admin-style.css">
+  <link rel="stylesheet" href="css/pwa.css">
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="nav-container">
+      <h1 class="logo">📊 Admin Dashboard</h1>
+      <div class="nav-user-info">
+        <span class="nav-welcome">Admin: <strong id="userName">...</strong></span>
+        <button id="logoutBtn" class="btn-nav-logout">Logout</button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Toast container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <div class="container">
+
+    <!-- Summary Cards -->
+    <div class="summary-cards">
+      <div class="summary-card summary-blue">
+        <div class="summary-icon">👥</div>
+        <div class="summary-info">
+          <div class="summary-value" id="cardTotalEmployees">—</div>
+          <div class="summary-label">Active Employees</div>
+        </div>
+      </div>
+      <div class="summary-card summary-green">
+        <div class="summary-icon">✅</div>
+        <div class="summary-info">
+          <div class="summary-value" id="cardPresentNow">—</div>
+          <div class="summary-label">Checked In Now</div>
+        </div>
+      </div>
+      <div class="summary-card summary-teal">
+        <div class="summary-icon">⏱️</div>
+        <div class="summary-info">
+          <div class="summary-value" id="cardTotalHours">—</div>
+          <div class="summary-label">Hours Today</div>
+        </div>
+      </div>
+      <div class="summary-card summary-red">
+        <div class="summary-icon">⚠️</div>
+        <div class="summary-info">
+          <div class="summary-value" id="cardLateCount">—</div>
+          <div class="summary-label">Late Today</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>Daily Check-ins (filtered period)</h3>
+        <div class="chart-container">
+          <canvas id="dailyChart"></canvas>
+        </div>
+      </div>
+      <div class="chart-card">
+        <h3>Punctuality Breakdown</h3>
+        <div class="chart-container">
+          <canvas id="statusChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="filters-card">
+      <h2>🔍 Filters</h2>
+      <div class="filter-group">
+        <div class="form-group">
+          <label for="filterEmployee">Employee</label>
+          <select id="filterEmployee" class="form-control">
+            <option value="">— All Employees —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="filterFromDate">From Date</label>
+          <input type="date" id="filterFromDate" class="form-control">
+        </div>
+        <div class="form-group">
+          <label for="filterToDate">To Date</label>
+          <input type="date" id="filterToDate" class="form-control">
+        </div>
+        <button id="filterBtn" class="btn btn-primary">Apply Filter</button>
+        <button id="resetBtn"  class="btn btn-secondary">Reset</button>
+      </div>
+    </div>
+
+    <!-- Export -->
+    <div class="export-card">
+      <h2>📤 Export Report</h2>
+      <p class="export-hint">Exports use the employee and date filters selected above.</p>
+      <div class="export-scope-group">
+        <div class="export-scope">
+          <span class="export-scope-label">Current Page</span>
+          <div class="export-btn-group">
+            <button id="exportPageExcelBtn" class="btn btn-excel">⬇ Excel</button>
+            <button id="exportPagePdfBtn"   class="btn btn-pdf">⬇ PDF</button>
+          </div>
+        </div>
+        <div class="export-scope-divider"></div>
+        <div class="export-scope">
+          <span class="export-scope-label">Full Dataset</span>
+          <div class="export-btn-group">
+            <button id="exportAllExcelBtn" class="btn btn-excel">⬇ Excel</button>
+            <button id="exportAllPdfBtn"   class="btn btn-pdf">⬇ PDF</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="statistics-section">
+      <h2>📈 Employee Statistics</h2>
+      <div class="filter-group">
+        <div class="form-group">
+          <label for="statsEmployee">Select Employee</label>
+          <select id="statsEmployee" class="form-control">
+            <option value="">— Choose an employee —</option>
+          </select>
+        </div>
+        <button id="statsBtn" class="btn btn-primary">Show Statistics</button>
+      </div>
+      <div id="statsContainer" class="stats-container" style="display:none;">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <h3>Total Days</h3>
+            <p class="stat-value" id="totalDays">0</p>
+          </div>
+          <div class="stat-card">
+            <h3>Late Days</h3>
+            <p class="stat-value" id="lateDays">0</p>
+          </div>
+          <div class="stat-card">
+            <h3>Total Hours</h3>
+            <p class="stat-value" id="totalHours">0</p>
+          </div>
+          <div class="stat-card">
+            <h3>Avg Hours/Day</h3>
+            <p class="stat-value" id="avgHours">0</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Attendance Records Table -->
+    <div class="table-card">
+      <h2>📋 Attendance Records</h2>
+      <div id="messageAlert" class="alert" style="display:none;"></div>
+      <div class="table-responsive">
+        <table class="table" id="attendanceTable">
+          <thead>
+            <tr>
+              <th>Employee</th>
+              <th>Date</th>
+              <th>Check In</th>
+              <th>Check Out</th>
+              <th>Duration</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="6">
+                <div class="empty-state">
+                  <div class="empty-state-icon">📋</div>
+                  <p>Apply filters to view attendance records.</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div id="paginationContainer" class="pagination"></div>
+    </div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="js/admin.js"></script>
+  <script src="js/pwa-manager.js"></script>
+</body>
+</html>
