@@ -2,7 +2,6 @@ const express     = require('express');
 const cors        = require('cors');
 const helmet      = require('helmet');
 const compression = require('compression');
-const dotenv      = require('dotenv');
 const path        = require('path');
 
 // Import middleware
@@ -14,32 +13,6 @@ const logger = require('./utils/logger');
 const authRoutes = require('./routes/authRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
 const reportRoutes = require('./routes/reportRoutes');
-
-// Load environment variables
-dotenv.config();
-
-// ─── Startup environment validation ───────────────────────────────────────────
-// Fail immediately if critical config is absent so the problem is obvious at
-// boot time rather than manifesting as a runtime error later.
-(function validateEnv() {
-  // JWT_SECRET is always required
-  const always  = ['JWT_SECRET'];
-  // Individual DB_* vars are only required when MYSQL_URL (Railway) is not set
-  const dbVars  = process.env.MYSQL_URL ? [] : ['DB_HOST', 'DB_USER', 'DB_NAME'];
-  const missing = [...always, ...dbVars].filter(k => !process.env[k]);
-
-  if (missing.length > 0) {
-    console.error(`\n[FATAL] Missing required environment variables: ${missing.join(', ')}`);
-    console.error('        Copy .env.example to .env and fill in the values.\n');
-    process.exit(1);
-  }
-
-  const INSECURE_DEFAULT = 'your_super_secret_jwt_key_change_this_in_production';
-  if (process.env.JWT_SECRET === INSECURE_DEFAULT) {
-    console.warn('\n[WARNING] JWT_SECRET is set to the insecure default value.');
-    console.warn('          Change it before deploying to production.\n');
-  }
-})();
 
 // Initialize Express app
 const app = express();
