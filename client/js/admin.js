@@ -547,9 +547,7 @@ async function exportReport(format, scope = 'all') {
     document.body.appendChild(anchor);
     anchor.click();
     document.body.removeChild(anchor);
-    URL.revokeObjectURL(objectUrl);
-
-    showToast(`${format.toUpperCase()} report (${scope}) downloaded successfully.`, 'success');
+  showToast(`${format.toUpperCase()} report (${scope}) downloaded successfully.`, 'success');
   } catch (error) {
     if (error.message !== 'Session expired') {
       showToast(error.message || 'Export failed. Please try again.', 'error');
@@ -557,6 +555,164 @@ async function exportReport(format, scope = 'all') {
   } finally {
     btn.disabled    = false;
     btn.textContent = origText;
+  }
+}
+
+// ─── Employee Management ──────────────────────────────────────────────────────
+
+function setupEmployeeManagement() {
+  const showAddBtn = document.getElementById('showAddEmployeeBtn');
+  const showListBtn = document.getElementById('showEmployeeListBtn');
+  const cancelAddBtn = document.getElementById('cancelAddBtn');
+  const backToFormBtn = document.getElementById('backToFormBtn');
+  const employeeForm = document.getElementById('employeeForm');
+
+  if (showAddBtn) showAddBtn.addEventListener('click', showAddEmployeeForm);
+  if (showListBtn) showListBtn.addEventListener('click', loadAndShowEmployeeList);
+  if (cancelAddBtn) cancelAddBtn.addEventListener('click', hideAddEmployeeForm);
+  if (backToFormBtn) backToFormBtn.addEventListener('click', hideEmployeeList);
+  if (employeeForm) employeeForm.addEventListener('submit', onAddEmployee);
+}
+
+function showAddEmployeeForm() {
+  document.getElementById('addEmployeeForm').style.display = 'block';
+  document.getElementById('employeeList').style.display = 'none';
+  document.getElementById('employeeForm').reset();
+}
+
+function hideAddEmployeeForm() {
+  document.getElementById('addEmployeeForm').style.display = 'none';
+  document.getElementById('employeeForm').reset();
+}
+
+function hideEmployeeList() {
+  document.getElementById('employeeList').style.display = 'none';
+}
+
+async function onAddEmployee(event) {
+  event.preventDefault();
+
+  const name = document.getElementById('empName').value.trim();
+  const email = document.getElementById('empEmail').value.trim();
+  const phone = document.getElementById('empPhone').value.trim();
+  const department = document.getElementById('empDepartment').value.trim();
+  const position = document.getElementById('empPosition').value.trim();
+  const hire_date = document.getElementById('empHireDate').value || null;
+  const allowed_latitude = parseFloat(document.getElementById('empLatitude').value) || 25.2048;
+  const allowed_longitude = parseFloat(document.getElementById('empLongitude').value) || 55.2708;
+  const allowed_location_radius = parseFloat(document.getElementById('empRadius').value) || 500;
+
+  if (!name || !email || !department || !position) {
+    showToast('Please fill all required fields.', 'warning');
+    return;
+  }
+
+  try {
+    const response = await authFetch(`${API}/auth/employees`, {
+      method: 'POST',
+      body: JSON.stringify({
+        name,
+        email,
+        phone,
+        department,
+        position,
+        hire_date,
+        allowed_latitude,
+        allowed_longitude,
+        allowed_location_radius
+      })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      showToast('Employee added successfully! ✓', 'success');
+      hideAddEmployeeForm();
+      await loadEmployees(); // Reload employees in dropdowns
+    } else {
+      showToast(data.message || 'Failed to add employee.', 'error');
+    }
+  } catch (error) {
+    if (error.message !== 'Session expired') {
+      showToast('Error adding employee.', 'error');
+    }
+  }
+}
+
+async function loadAndShowEmployeeList() {
+  try {
+    document.getElementById('employeeList').style.display = 'block';
+    document.getElementById('addEmployeeForm').style.display = 'none';
+    
+    const tbody = document.querySelector('#employeeTable tbody');
+    tbody.innerHTML = '<tr><td colspan="6">Loading...</td></tr>';
+
+    const response = await authFetch(`${API}/auth/employees`);
+    const data = await response.json();
+
+    if (data.status === 'success' && data.data) {
+      populateEmployeeTable(data.data);
+    } else {
+      tbody.innerHTML = '<tr><td colspan="6">No employees found.</td></tr>';
+    }
+  } catch (error) {
+    if (error.message !== 'Session expired') {
+      showToast('Failed to load employees.', 'error');
+    }
+  }
+}
+
+function populateEmployeeTable(employees) {
+  const tbody = document.querySelector('#employeeTable tbody');
+  
+  if (!employees.length) {
+    tbody.innerHTML = '<tr><td colspan="6">No employees found.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = '';
+  employees.forEach(emp => {
+    const statusBadge = emp.status === 'active'
+      ? '<span class="badge success">Active</span>'
+      : '<span class="badge warning">Inactive</span>';
+
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><strong>${emp.name}</strong></td>
+      <td>${emp.email || '—'}</td>
+      <td>${emp.department || '—'}</td>
+      <td>${emp.position || '—'}</td>
+      <td>${statusBadge}</td>
+      <td>
+        <button class="btn btn-sm btn-danger" onclick="onDeleteEmployee(${emp.id}, '${emp.name}')">Delete</button>
+      </td>`;
+    tbody.appendChild(row);
+  });
+}
+
+async function onDeleteEmployee(empId, empName) {
+  if (!confirm(`Are you sure you want to delete ${empName}? This will also delete associated user accounts and attendance records.`)) {
+    return;
+  }
+
+  try {
+    const response = await authFetch(`${API}/auth/employees/${empId}`, {
+      method: 'DELETE'
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      showToast(`Employee ${empName} deleted successfully.`, 'success');
+      await loadAndShowEmployeeList(); // Refresh the list
+      await loadEmployees(); // Reload employees in dropdowns
+    } else {
+      showToast(data.message || 'Failed to delete employee.', 'error');
+    }
+  } catch (error) {
+    if (error.message !== 'Session expired') {
+      showToast('Error deleting employee.', 'error');
+    }
   }
 }
 
@@ -578,4 +734,7 @@ function showMessage(message, type = 'info') {
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
-document.addEventListener('DOMContentLoaded', init);
+document.addEventListener('DOMContentLoaded', () => {
+  init();
+  setupEmployeeManagement();
+});

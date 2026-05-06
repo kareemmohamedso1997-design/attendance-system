@@ -23,16 +23,25 @@ async function migrate() {
   console.log('='.repeat(52));
 
   const schemaPath = path.join(__dirname, 'schema.sql');
-  const raw = fs.readFileSync(schemaPath, 'utf8');
+  let raw = fs.readFileSync(schemaPath, 'utf8');
 
-  // Strip block comments (/** ... */)
-  const stripped = raw.replace(/\/\*[\s\S]*?\*\//g, '');
+  // Remove all comments (both /* */ and --)
+  // This is more robust than trying to preserve formatting
+  raw = raw
+    .replace(/\/\*[\s\S]*?\*\//gm, '')  // Remove /* */ comments
+    .split('\n')
+    .map(line => {
+      // Remove -- comments from each line
+      const commentIdx = line.indexOf('--');
+      return commentIdx >= 0 ? line.substring(0, commentIdx) : line;
+    })
+    .join('\n');
 
-  // Split on semicolons, clean up, and filter out directives that
-  // only make sense for local MySQL (CREATE DATABASE / USE <db>)
-  const statements = stripped
+  // Split on semicolons and clean up statements
+  const statements = raw
     .split(';')
-    .map(s => s.replace(/--[^\n]*/g, '').trim())   // remove line comments
+    .map(s => s.trim())
+    .map(s => s.replace(/\s+/g, ' ')) // Normalize whitespace
     .filter(s => s.length > 0)
     .filter(s => !/^CREATE\s+DATABASE/i.test(s))
     .filter(s => !/^USE\s+/i.test(s));

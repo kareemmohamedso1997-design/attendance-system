@@ -103,6 +103,87 @@
       </div>
     </div>
 
+    <!-- Add Employee Section -->
+    <div class="employee-card">
+      <h2>👥 Manage Employees</h2>
+      <div class="employee-buttons">
+        <button id="showAddEmployeeBtn" class="btn btn-success">➕ Add New Employee</button>
+        <button id="showEmployeeListBtn" class="btn btn-secondary">📋 View All Employees</button>
+      </div>
+
+      <!-- Add Employee Form -->
+      <div id="addEmployeeForm" class="add-employee-form" style="display:none;">
+        <h3>Add New Employee</h3>
+        <form id="employeeForm">
+          <div class="form-group">
+            <label for="empName">Name *</label>
+            <input type="text" id="empName" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="empEmail">Email *</label>
+            <input type="email" id="empEmail" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="empPhone">Phone</label>
+            <input type="tel" id="empPhone" class="form-control">
+          </div>
+          <div class="form-group">
+            <label for="empDepartment">Department *</label>
+            <input type="text" id="empDepartment" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="empPosition">Position *</label>
+            <input type="text" id="empPosition" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="empHireDate">Hire Date</label>
+            <input type="date" id="empHireDate" class="form-control">
+          </div>
+          <div class="form-group">
+            <label for="empLatitude">Location Latitude (default: 25.2048)</label>
+            <input type="number" id="empLatitude" class="form-control" step="0.0001" value="25.2048">
+          </div>
+          <div class="form-group">
+            <label for="empLongitude">Location Longitude (default: 55.2708)</label>
+            <input type="number" id="empLongitude" class="form-control" step="0.0001" value="55.2708">
+          </div>
+          <div class="form-group">
+            <label for="empRadius">Location Radius (meters, default: 500)</label>
+            <input type="number" id="empRadius" class="form-control" value="500">
+          </div>
+          <div class="form-buttons">
+            <button type="submit" class="btn btn-success">Save Employee</button>
+            <button type="button" id="cancelAddBtn" class="btn btn-secondary">Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Employee List -->
+      <div id="employeeList" class="employee-list" style="display:none;">
+        <h3>Employees List</h3>
+        <div class="table-responsive">
+          <table class="table" id="employeeTable">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Department</th>
+                <th>Position</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="6">Loading employees...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <button id="backToFormBtn" class="btn btn-secondary">Back</button>
+      </div>
+    </div>
+
     <!-- Export -->
     <div class="export-card">
       <h2>📤 Export Report</h2>

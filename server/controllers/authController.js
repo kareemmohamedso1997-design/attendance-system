@@ -335,10 +335,146 @@ const getCurrentUser = async (req, res, next) => {
   }
 };
 
+/**
+ * Add New Employee
+ * POST /api/auth/employees
+ * Only admins can add employees
+ */
+const addEmployee = async (req, res, next) => {
+  try {
+    const { name, email, phone, department, position, hire_date, allowed_latitude, allowed_longitude, allowed_location_radius } = req.body;
+
+    // Validate required fields
+    if (!name || !email || !department || !position) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'name, email, department, and position are required'
+      });
+    }
+
+    // Validate email
+    if (!validateEmail(email)) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Invalid email format'
+      });
+    }
+
+    // Check if email already exists
+    const [existingEmployees] = await db.query('SELECT id FROM employees WHERE email = ?', [email]);
+
+    if (existingEmployees.length > 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Email already exists'
+      });
+    }
+
+    // Set default location (Dubai coordinates) if not provided
+    const latitude = allowed_latitude || 25.2048;
+    const longitude = allowed_longitude || 55.2708;
+    const radius = allowed_location_radius || 500;
+
+    // Insert employee into database
+    const [result] = await db.query(
+      `INSERT INTO employees (name, email, phone, department, position, hire_date, allowed_latitude, allowed_longitude, allowed_location_radius)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [name, email, phone || null, department, position, hire_date || null, latitude, longitude, radius]
+    );
+
+    logger.info(`New employee added: ${name} (${email}) - ID: ${result.insertId}`);
+
+    res.status(201).json({
+      status: 'success',
+      message: 'Employee added successfully',
+      data: {
+        id: result.insertId,
+        name,
+        email,
+        department,
+        position
+      }
+    });
+  } catch (error) {
+    logger.error('Add employee error:', error.message);
+    next(error);
+  }
+};
+
+/**
+ * Get All Employees
+ * GET /api/auth/employees
+ * Only admins can view all employees
+ */
+const getAllEmployees = async (req, res, next) => {
+  try {
+    const [employees] = await db.query(
+      `SELECT id, name, email, phone, department, position, hire_date, status, created_at 
+       FROM employees 
+       ORDER BY name ASC`
+    );
+
+    res.json({
+      status: 'success',
+      data: employees
+    });
+  } catch (error) {
+    logger.error('Get employees error:', error.message);
+    next(error);
+  }
+};
+
+/**
+ * Delete Employee
+ * DELETE /api/auth/employees/:id
+ * Only admins can delete employees
+ */
+const deleteEmployee = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Check if employee exists
+    const [employees] = await db.query('SELECT name FROM employees WHERE id = ?', [id]);
+
+    if (employees.length === 0) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Employee not found'
+      });
+    }
+
+    const employeeName = employees[0].name;
+
+    // Check if employee has associated user
+    const [users] = await db.query('SELECT id FROM users WHERE employee_id = ?', [id]);
+
+    if (users.length > 0) {
+      // Delete user first (cascade will handle it)
+      await db.query('DELETE FROM users WHERE employee_id = ?', [id]);
+    }
+
+    // Delete employee (cascade will handle attendance records)
+    await db.query('DELETE FROM employees WHERE id = ?', [id]);
+
+    logger.info(`Employee deleted: ${employeeName} - ID: ${id}`);
+
+    res.json({
+      status: 'success',
+      message: 'Employee deleted successfully'
+    });
+  } catch (error) {
+    logger.error('Delete employee error:', error.message);
+    next(error);
+  }
+};
+
 module.exports = {
   login,
   register,
   refreshToken,
   logout,
-  getCurrentUser
+  getCurrentUser,
+  addEmployee,
+  getAllEmployees,
+  deleteEmployee
 };

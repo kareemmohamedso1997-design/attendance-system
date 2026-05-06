@@ -124,9 +124,35 @@ const canAccessEmployeeData = (req, res, next) => {
   });
 };
 
+/**
+ * Authorize based on role
+ * Usage: authorizeRole('admin') or authorizeRole('employee', 'admin')
+ */
+const authorizeRole = (...roles) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'Authentication required'
+      });
+    }
+
+    if (!roles.includes(req.user.role)) {
+      logger.warn(`User ${req.user.userId} with role ${req.user.role} denied access to ${req.originalUrl}`);
+      return res.status(403).json({
+        status: 'error',
+        message: `Access required: ${roles.join(' or ')}`
+      });
+    }
+
+    next();
+  };
+};
+
 module.exports = {
   authenticateToken,
   isAdmin,
   isEmployee,
-  canAccessEmployeeData
+  canAccessEmployeeData,
+  authorizeRole
 };
