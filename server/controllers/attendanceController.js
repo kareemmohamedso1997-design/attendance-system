@@ -442,11 +442,11 @@ const getStatistics = async (req, res, next) => {
     return res.json({
       status: 'success',
       data: {
-        total_days:           stats.total_days          || 0,
-        late_days:            stats.late_days           || 0,
-        total_working_hours:  parseFloat((stats.total_working_hours  || 0).toFixed(2)),
-        avg_working_hours:    parseFloat((stats.avg_working_hours    || 0).toFixed(2)),
-        total_overtime_hours: parseFloat((stats.total_overtime_hours || 0).toFixed(2))
+        total_days:           Number(stats.total_days)           || 0,
+        late_days:            Number(stats.late_days)            || 0,
+        total_working_hours:  parseFloat(Number(stats.total_working_hours  || 0).toFixed(2)),
+        avg_working_hours:    parseFloat(Number(stats.avg_working_hours    || 0).toFixed(2)),
+        total_overtime_hours: parseFloat(Number(stats.total_overtime_hours || 0).toFixed(2))
       }
     });
   } catch (error) {
