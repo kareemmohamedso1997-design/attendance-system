@@ -338,13 +338,16 @@ const getCurrentUser = async (req, res, next) => {
 /**
  * Add New Employee
  * POST /api/auth/employees
- * Only admins can add employees
+ * Admin only. Creates the employee record AND a ready-to-use login account.
  */
 const addEmployee = async (req, res, next) => {
   try {
-    const { name, email, phone, department, position, hire_date, allowed_latitude, allowed_longitude, allowed_location_radius } = req.body;
+    const {
+      name, email, phone, department, position, hire_date,
+      allowed_latitude, allowed_longitude, allowed_location_radius
+    } = req.body;
 
-    // Validate required fields
+    // ── Validate required fields ──────────────────────────────────────────
     if (!name || !email || !department || !position) {
       return res.status(400).json({
         status: 'error',
@@ -352,47 +355,82 @@ const addEmployee = async (req, res, next) => {
       });
     }
 
-    // Validate email
     if (!validateEmail(email)) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Invalid email format'
-      });
+      return res.status(400).json({ status: 'error', message: 'Invalid email format' });
     }
 
-    // Check if email already exists
-    const [existingEmployees] = await db.query('SELECT id FROM employees WHERE email = ?', [email]);
-
-    if (existingEmployees.length > 0) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Email already exists'
-      });
+    // ── Duplicate checks ──────────────────────────────────────────────────
+    const [[existingEmp]] = await db.query(
+      'SELECT id FROM employees WHERE email = ?', [email]
+    );
+    if (existingEmp) {
+      return res.status(409).json({ status: 'error', message: 'An employee with this email already exists.' });
     }
 
-    // Set default location (Dubai coordinates) if not provided
-    const latitude = allowed_latitude || 25.2048;
-    const longitude = allowed_longitude || 55.2708;
-    const radius = allowed_location_radius || 500;
+    const [[existingUser]] = await db.query(
+      'SELECT id FROM users WHERE email = ?', [email]
+    );
+    if (existingUser) {
+      return res.status(409).json({ status: 'error', message: 'A login account with this email already exists.' });
+    }
 
-    // Insert employee into database
-    const [result] = await db.query(
-      `INSERT INTO employees (name, email, phone, department, position, hire_date, allowed_latitude, allowed_longitude, allowed_location_radius)
+    // ── Insert employee ───────────────────────────────────────────────────
+    const latitude  = allowed_latitude         || 25.2048;
+    const longitude = allowed_longitude        || 55.2708;
+    const radius    = allowed_location_radius  || 500;
+
+    const [empResult] = await db.query(
+      `INSERT INTO employees (name, email, phone, department, position, hire_date,
+                              allowed_latitude, allowed_longitude, allowed_location_radius)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [name, email, phone || null, department, position, hire_date || null, latitude, longitude, radius]
     );
+    const employeeId = empResult.insertId;
 
-    logger.info(`New employee added: ${name} (${email}) - ID: ${result.insertId}`);
+    // ── Derive a unique username from the email local part ────────────────
+    const baseUsername = email.split('@')[0]
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]/g, '')  // strip chars outside allowed set
+      .substring(0, 20) || `emp${employeeId}`;
 
-    res.status(201).json({
+    const [[takenUsername]] = await db.query(
+      'SELECT id FROM users WHERE username = ?', [baseUsername]
+    );
+    const username = takenUsername
+      ? `${baseUsername.substring(0, 16)}_${employeeId}`
+      : baseUsername;
+
+    // ── Hash the default password ─────────────────────────────────────────
+    const defaultPassword = process.env.DEFAULT_USER_PASSWORD || '123456';
+    const ROUNDS          = parseInt(process.env.BCRYPT_ROUNDS) || 10;
+    const passwordHash    = await bcrypt.hash(defaultPassword, ROUNDS);
+
+    // ── Insert login account (role_id 2 = employee) ───────────────────────
+    await db.query(
+      `INSERT INTO users (employee_id, username, email, password_hash, role_id, is_active)
+       VALUES (?, ?, ?, ?, 2, 1)`,
+      [employeeId, username, email, passwordHash]
+    );
+
+    logger.info(`Employee created: ${name} <${email}> id=${employeeId} → login username=${username}`);
+
+    return res.status(201).json({
       status: 'success',
-      message: 'Employee added successfully',
+      message: 'Employee and login account created successfully.',
       data: {
-        id: result.insertId,
-        name,
-        email,
-        department,
-        position
+        employee: {
+          id:         employeeId,
+          name,
+          email,
+          phone:      phone      || null,
+          department,
+          position,
+          hire_date:  hire_date  || null
+        },
+        login: {
+          username,
+          password: defaultPassword
+        }
       }
     });
   } catch (error) {
@@ -427,40 +465,36 @@ const getAllEmployees = async (req, res, next) => {
 /**
  * Delete Employee
  * DELETE /api/auth/employees/:id
- * Only admins can delete employees
+ * Admin only. Removes the login account first, then the employee record.
+ * Attendance records are cascade-deleted by the FK on the employees table.
  */
 const deleteEmployee = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const id = parseInt(req.params.id, 10);
 
-    // Check if employee exists
-    const [employees] = await db.query('SELECT name FROM employees WHERE id = ?', [id]);
-
-    if (employees.length === 0) {
-      return res.status(404).json({
-        status: 'error',
-        message: 'Employee not found'
-      });
+    if (!Number.isInteger(id) || id < 1) {
+      return res.status(400).json({ status: 'error', message: 'Employee ID must be a positive integer.' });
     }
 
-    const employeeName = employees[0].name;
+    const [[employee]] = await db.query(
+      'SELECT id, name FROM employees WHERE id = ?', [id]
+    );
 
-    // Check if employee has associated user
-    const [users] = await db.query('SELECT id FROM users WHERE employee_id = ?', [id]);
-
-    if (users.length > 0) {
-      // Delete user first (cascade will handle it)
-      await db.query('DELETE FROM users WHERE employee_id = ?', [id]);
+    if (!employee) {
+      return res.status(404).json({ status: 'error', message: 'Employee not found.' });
     }
 
-    // Delete employee (cascade will handle attendance records)
+    // Delete login account first (FK requires this order)
+    await db.query('DELETE FROM users WHERE employee_id = ?', [id]);
+
+    // Delete employee (FK CASCADE removes attendance + location rows)
     await db.query('DELETE FROM employees WHERE id = ?', [id]);
 
-    logger.info(`Employee deleted: ${employeeName} - ID: ${id}`);
+    logger.info(`Employee deleted: ${employee.name} (id=${id})`);
 
-    res.json({
+    return res.json({
       status: 'success',
-      message: 'Employee deleted successfully'
+      message: `Employee "${employee.name}" and their login account have been deleted.`
     });
   } catch (error) {
     logger.error('Delete employee error:', error.message);
