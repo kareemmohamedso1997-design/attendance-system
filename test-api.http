@@ -1,0 +1,270 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# Attendance System — VS Code REST Client
+# Extension: REST Client (humao.rest-client)
+#
+# HOW TO USE:
+#   1. Click "Send Request" on the LOGIN request below (step ①)
+#   2. Token is extracted and stored automatically into {{token}}
+#   3. Click "Send Request" on any other request — no copy-paste needed
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@baseUrl = https://attendance-system-1-02ay.onrender.com
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+# HEALTH
+# ───────────────────────────────────────────────────────────────────────────────
+
+### Health Check — no auth required
+GET {{baseUrl}}/api/health
+Accept: application/json
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+# AUTH
+# ───────────────────────────────────────────────────────────────────────────────
+
+### ① LOGIN — run this first. Token is captured automatically.
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin@company.com",
+  "password": "Admin@1234"
+}
+
+> {%
+  client.global.set("token", response.body.data.accessToken);
+  client.global.set("refreshToken", response.body.data.refreshToken);
+  client.log("Token saved — first 40 chars: " + response.body.data.accessToken.substring(0, 40));
+%}
+
+###
+
+### Get Current User (me)
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{token}}
+Accept: application/json
+
+###
+
+### Register a new login account
+# Requires: an existing employee_id in the employees table.
+# Password rules: min 8 chars, 1 uppercase, 1 lowercase, 1 number.
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "username": "jane.doe",
+  "email": "jane@company.com",
+  "password": "Password1",
+  "employee_id": 2
+}
+
+###
+
+### Refresh access token using the refresh token saved on login
+POST {{baseUrl}}/api/auth/refresh
+Content-Type: application/json
+
+{
+  "refreshToken": "{{refreshToken}}"
+}
+
+###
+
+### Logout
+POST {{baseUrl}}/api/auth/logout
+Authorization: Bearer {{token}}
+Content-Length: 0
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+# EMPLOYEES  (managed under /api/auth — admin only)
+# ───────────────────────────────────────────────────────────────────────────────
+
+###
+
+### Add Employee
+POST {{baseUrl}}/api/auth/employees
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "name": "Jane Smith",
+  "email": "jane@company.com",
+  "phone": "+1234567890",
+  "department": "Engineering",
+  "position": "Senior Developer",
+  "hire_date": "2024-01-15",
+  "allowed_latitude": 25.2048,
+  "allowed_longitude": 55.2708,
+  "allowed_location_radius": 500
+}
+
+###
+
+### Get All Employees
+GET {{baseUrl}}/api/auth/employees
+Authorization: Bearer {{token}}
+Accept: application/json
+
+###
+
+### Delete Employee  ← change the id at the end of the URL
+DELETE {{baseUrl}}/api/auth/employees/2
+Authorization: Bearer {{token}}
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+# USERS  (admin only)
+# ───────────────────────────────────────────────────────────────────────────────
+
+###
+
+### Get All Users
+GET {{baseUrl}}/api/users
+Authorization: Bearer {{token}}
+Accept: application/json
+
+###
+
+### Get User by ID  ← change the id at the end of the URL
+GET {{baseUrl}}/api/users/1
+Authorization: Bearer {{token}}
+Accept: application/json
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+# ATTENDANCE
+# ───────────────────────────────────────────────────────────────────────────────
+# NOTE: employee_id is derived automatically from the JWT.
+#       You do NOT pass user_id in the body.
+#       GPS coordinates are optional (omit latitude/longitude for no-GPS check-in).
+# ───────────────────────────────────────────────────────────────────────────────
+
+###
+
+### Check In
+POST {{baseUrl}}/api/attendance/checkin
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "latitude": 25.2048,
+  "longitude": 55.2708,
+  "accuracy": 10
+}
+
+###
+
+### Check In (no GPS — minimal body)
+POST {{baseUrl}}/api/attendance/checkin
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{}
+
+###
+
+### Check Out
+POST {{baseUrl}}/api/attendance/checkout
+Content-Type: application/json
+Authorization: Bearer {{token}}
+
+{
+  "latitude": 25.2048,
+  "longitude": 55.2708,
+  "accuracy": 10
+}
+
+###
+
+### Get Attendance List  (employees see own records; admins see all)
+GET {{baseUrl}}/api/attendance?from_date=2024-01-01&to_date=2026-12-31
+Authorization: Bearer {{token}}
+Accept: application/json
+
+###
+
+### Get Today's Attendance
+GET {{baseUrl}}/api/attendance/today
+Authorization: Bearer {{token}}
+Accept: application/json
+
+###
+
+### Get Employee Current Status  ← change the employeeId at the end of the URL
+GET {{baseUrl}}/api/attendance/status/1
+Authorization: Bearer {{token}}
+Accept: application/json
+
+###
+
+### Get All Active Employees (attendance module list)
+GET {{baseUrl}}/api/attendance/employees
+Authorization: Bearer {{token}}
+Accept: application/json
+
+###
+
+### Get Attendance Statistics
+GET {{baseUrl}}/api/attendance/statistics
+Authorization: Bearer {{token}}
+Accept: application/json
+
+###
+
+### Get User Attendance History — paginated  ← change the id in the URL
+GET {{baseUrl}}/api/attendance/user/1?limit=20&offset=0
+Authorization: Bearer {{token}}
+Accept: application/json
+
+
+# ───────────────────────────────────────────────────────────────────────────────
+# REPORTS  (admin only)
+# ───────────────────────────────────────────────────────────────────────────────
+
+###
+
+### Attendance Summary Snapshot
+GET {{baseUrl}}/api/reports/summary
+Authorization: Bearer {{token}}
+Accept: application/json
+
+###
+
+### Per-User Lifetime Report  ← change the id in the URL
+GET {{baseUrl}}/api/reports/user/1
+Authorization: Bearer {{token}}
+Accept: application/json
+
+###
+
+### Export Excel — full date range, all records
+# Response is a binary .xlsx file.
+# In VS Code REST Client: right-click the response → "Save Response Body" → pick a .xlsx filename.
+GET {{baseUrl}}/api/reports/excel?from_date=2024-01-01&to_date=2026-12-31&scope=all
+Authorization: Bearer {{token}}
+Accept: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
+
+###
+
+### Export Excel — page mode (first 20 rows)
+GET {{baseUrl}}/api/reports/excel?from_date=2024-01-01&to_date=2026-12-31&scope=page&limit=20&offset=0
+Authorization: Bearer {{token}}
+
+###
+
+### Export PDF — full date range, all records
+# Response is a binary .pdf file.
+# In VS Code REST Client: right-click the response → "Save Response Body" → pick a .pdf filename.
+GET {{baseUrl}}/api/reports/pdf?from_date=2024-01-01&to_date=2026-12-31&scope=all
+Authorization: Bearer {{token}}
+Accept: application/pdf
+
+###
+
+### Export PDF — filtered by employee
+GET {{baseUrl}}/api/reports/pdf?from_date=2024-01-01&to_date=2026-12-31&scope=all&employee_id=1
+Authorization: Bearer {{token}}

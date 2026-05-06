@@ -347,15 +347,16 @@ const getAttendance = async (req, res, next) => {
       whereParams
     );
 
-    // Page of records
+    // Page of records (LIMIT/OFFSET embedded as literals — prepared-statement
+    // drivers on some MySQL servers reject numeric params for LIMIT/OFFSET)
     const [records] = await db.query(
       `SELECT a.id, e.id AS employee_id, e.name AS employee_name,
               a.check_in, a.check_out, a.working_hours, a.overtime_hours,
               a.is_late, a.is_locked
        ${BASE} ${where}
        ORDER BY a.check_in DESC
-       LIMIT ? OFFSET ?`,
-      [...whereParams, limit, offset]
+       LIMIT ${limit} OFFSET ${offset}`,
+      whereParams
     );
 
     return res.json({ status: 'success', data: records, count: records.length, total });
@@ -373,7 +374,7 @@ const getTodayAttendance = async (req, res, next) => {
              a.check_in, a.check_out, a.working_hours, a.overtime_hours, a.is_late
       FROM attendance a
       JOIN employees e ON a.employee_id = e.id
-      WHERE DATE(a.check_in) = CURDATE()
+      WHERE DATE(a.check_in) = CAST(UTC_TIMESTAMP() AS DATE)
     `;
     const params = [];
 
@@ -489,6 +490,57 @@ const getCurrentStatus = async (req, res, next) => {
   }
 };
 
+// ─── Get attendance records for a single employee ─────────────────────────────
+
+/**
+ * GET /api/attendance/user/:id
+ * Paginated attendance history for one employee.
+ * Employees may only query their own records; admins may query anyone.
+ */
+const getUserAttendance = async (req, res, next) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+
+    if (!Number.isInteger(id) || id < 1) {
+      return next(new AppError('Employee ID must be a positive integer', 400));
+    }
+
+    // Employees can only see their own history
+    if (req.user.role === 'employee' && req.user.employeeId !== id) {
+      return next(new AppError('You can only access your own attendance records.', 403));
+    }
+
+    const limit  = Math.min(parseInt(req.query.limit)  || 20, 200);
+    const offset = Math.max(parseInt(req.query.offset) || 0,  0);
+
+    const [[{ total }]] = await db.query(
+      `SELECT COUNT(*) AS total FROM attendance WHERE employee_id = ?`,
+      [id]
+    );
+
+    const [records] = await db.query(
+      `SELECT a.id, a.employee_id, e.name AS employee_name,
+              a.check_in, a.check_out, a.working_hours,
+              a.overtime_hours, a.is_late, a.is_locked
+       FROM attendance a
+       JOIN employees e ON a.employee_id = e.id
+       WHERE a.employee_id = ?
+       ORDER BY a.check_in DESC
+       LIMIT ${limit} OFFSET ${offset}`,
+      [id]
+    );
+
+    return res.json({
+      success: true,
+      count: records.length,
+      total: Number(total),
+      data:  records
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 module.exports = {
   checkIn,
   checkOut,
@@ -496,5 +548,6 @@ module.exports = {
   getTodayAttendance,
   getEmployees,
   getStatistics,
-  getCurrentStatus
+  getCurrentStatus,
+  getUserAttendance
 };

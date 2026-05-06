@@ -3,40 +3,32 @@ const cors        = require('cors');
 const helmet      = require('helmet');
 const compression = require('compression');
 const path        = require('path');
+const fs          = require('fs');
 
-// Import middleware
-const errorHandler = require('./middleware/errorHandler');
-const { generalLimiter } = require('./middleware/rateLimitMiddleware');
-const logger = require('./utils/logger');
+const errorHandler             = require('./middleware/errorHandler');
+const { generalLimiter }       = require('./middleware/rateLimitMiddleware');
+const logger                   = require('./utils/logger');
 
-// Import routes
-const authRoutes = require('./routes/authRoutes');
+const authRoutes       = require('./routes/authRoutes');
+const userRoutes       = require('./routes/userRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
-const reportRoutes = require('./routes/reportRoutes');
+const reportRoutes     = require('./routes/reportRoutes');
 
-// Initialize Express app
 const app = express();
 
-/**
- * Security Middleware
- */
+// ── Security ──────────────────────────────────────────────────────────────────
 app.use(helmet());
 
-/**
- * Compression — gzip all responses ≥ 1 KB
- */
+// ── Compression ───────────────────────────────────────────────────────────────
 app.use(compression({ threshold: 1024 }));
 
-/**
- * CORS Configuration
- */
-const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || 'http://localhost:3000')
+// ── CORS ──────────────────────────────────────────────────────────────────────
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || '*')
   .split(',').map(o => o.trim());
 
 app.use(cors({
   origin(origin, callback) {
-    // Allow server-to-server requests (no Origin header) and listed origins
-    if (!origin || ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*')) {
+    if (!origin || ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.includes(origin)) {
       callback(null, true);
     } else {
       callback(new Error(`CORS: origin '${origin}' not allowed`));
@@ -46,89 +38,84 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 
-/**
- * Body Parser Middleware
- */
+// ── Body parser ───────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10kb' }));
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
-/**
- * Request Logging
- */
+// ── Request logging ───────────────────────────────────────────────────────────
 app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.path}`);
+  const start = Date.now();
+  res.on('finish', () => {
+    const ms = Date.now() - start;
+    logger.info(`${req.method} ${req.originalUrl} ${res.statusCode} - ${ms}ms`);
+  });
   next();
 });
 
-/**
- * Rate Limiting
- */
+// ── Rate limiting on all /api/* routes ────────────────────────────────────────
 app.use('/api/', generalLimiter);
 
-/**
- * Serve Static Files
- * - HTML and service-worker: no-cache (always revalidate)
- * - JS / CSS: 1 week (PWA service worker takes over after first load)
- * - Images / fonts: 30 days
- */
+// ── Static files (PWA client) ─────────────────────────────────────────────────
 app.use(express.static(path.join(__dirname, '../client'), {
   setHeaders(res, filePath) {
     if (/\.(html)$/.test(filePath) || filePath.endsWith('service-worker.js')) {
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     } else if (/\.(js|css)$/.test(filePath)) {
-      res.setHeader('Cache-Control', 'public, max-age=604800');   // 7 days
+      res.setHeader('Cache-Control', 'public, max-age=604800');
     } else if (/\.(png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf)$/.test(filePath)) {
-      res.setHeader('Cache-Control', 'public, max-age=2592000');  // 30 days
+      res.setHeader('Cache-Control', 'public, max-age=2592000');
     }
   }
 }));
 
-/**
- * API Routes
- */
-app.use('/api/auth', authRoutes);
-app.use('/api/attendance', attendanceRoutes);
-app.use('/api/reports', reportRoutes);
-
-/**
- * Health Check Endpoint
- */
+// ── Health check ──────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
   res.json({
-    status: 'success',
-    message: 'Server is running',
-    timestamp: new Date().toISOString()
+    success: true,
+    data: {
+      status:      'ok',
+      environment: process.env.NODE_ENV || 'development',
+      timestamp:   new Date().toISOString()
+    }
   });
 });
 
-/**
- * Serve HTML Pages
- */
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/index.html'));
-});
+// ── API routes ────────────────────────────────────────────────────────────────
+app.use('/api/auth',       authRoutes);
+app.use('/api/users',      userRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/reports',    reportRoutes);
 
-app.get('/admin', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/admin.html'));
-});
+// ── Frontend page routes ──────────────────────────────────────────────────────
+const CLIENT_DIR = path.join(__dirname, '../client');
 
-app.get('/login', (req, res) => {
-  res.sendFile(path.join(__dirname, '../client/login.html'));
-});
+function serveClientPage(page) {
+  return (req, res) => {
+    const filePath = path.join(CLIENT_DIR, page);
+    if (fs.existsSync(filePath)) {
+      res.sendFile(filePath);
+    } else {
+      res.json({ success: true, message: 'Attendance System API is running', docs: '/api/health' });
+    }
+  };
+}
 
-/**
- * 404 Handler
- */
+app.get('/',      serveClientPage('index.html'));
+app.get('/admin', serveClientPage('admin.html'));
+app.get('/login', serveClientPage('login.html'));
+
+// ── 404 — must be AFTER all routes ───────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({
-    status: 'error',
-    message: 'Route not found'
+    success: false,
+    error: {
+      statusCode: 404,
+      message: `Route ${req.originalUrl} not found`
+    }
   });
 });
 
-/**
- * Global Error Handler (Must be last)
- */
+// ── Global error handler — must be last ──────────────────────────────────────
 app.use(errorHandler);
 
 module.exports = app;

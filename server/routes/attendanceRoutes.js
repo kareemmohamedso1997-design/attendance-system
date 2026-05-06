@@ -8,6 +8,7 @@ const { attendanceLimiter } = require('../middleware/rateLimitMiddleware');
 const { authenticateToken, isEmployee, canAccessEmployeeData } = require('../middleware/authMiddleware');
 const attendanceController = require('../controllers/attendanceController');
 
+
 const router = express.Router();
 
 /**
@@ -52,9 +53,15 @@ router.get('/status/:employeeId', validateEmployeeIdParam, canAccessEmployeeData
 router.get('/employees', attendanceController.getEmployees);
 
 /**
- * GET /api/statistics
+ * GET /api/attendance/statistics
  * Get attendance statistics
  */
 router.get('/statistics', attendanceController.getStatistics);
+
+/**
+ * GET /api/attendance/user/:id
+ * Paginated history for one employee (own data or admin)
+ */
+router.get('/user/:id', attendanceController.getUserAttendance);
 
 module.exports = router;

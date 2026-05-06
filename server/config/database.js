@@ -16,14 +16,14 @@ const pool = mysql.createPool({
   waitForConnections: true,
   connectionLimit:    10,
   queueLimit:         0,
+  connectTimeout:     10000,
   enableKeepAlive:    true,
-  keepAliveInitialDelay: 0,
-  charset: 'utf8mb4',
+  keepAliveInitialDelay: 10000,
+  charset:   'utf8mb4',
+  timezone:  'Z',
 
-  // Managed MySQL on Railway / Render / PlanetScale uses TLS
-  ssl: process.env.NODE_ENV === 'production'
-    ? { rejectUnauthorized: false }
-    : undefined
+  // Managed MySQL on Clever Cloud / Railway / Render uses TLS
+  ssl: { rejectUnauthorized: false }
 });
 
 logger.info(`Database: connecting to ${url.hostname}:${url.port || 3306}/${url.pathname.replace(/^\//, '')}`);

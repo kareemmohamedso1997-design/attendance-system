@@ -1,0 +1,462 @@
+{
+  "info": {
+    "name": "Attendance System API",
+    "description": "Complete test collection — import and press Send. Login auto-saves the JWT to {{token}}.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://attendance-system-1-02ay.onrender.com",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health"]
+            },
+            "description": "No auth required. Returns server status and environment."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login (saves token automatically)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.data && json.data.accessToken) {",
+                  "    pm.collectionVariables.set('token', json.data.accessToken);",
+                  "    console.log('✅ Token saved. Expires when JWT does.');",
+                  "} else {",
+                  "    console.warn('⚠️ accessToken not found in response:', JSON.stringify(json));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"admin@company.com\",\n  \"password\": \"Admin@1234\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login with username OR email in the `username` field. On success, token is automatically stored in {{token}}."
+          }
+        },
+        {
+          "name": "Get Current User (me)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "Register New User",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"john.doe\",\n  \"email\": \"john@company.com\",\n  \"password\": \"Password1\",\n  \"employee_id\": 2\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Register a login account for an existing employee. employee_id must already exist in the employees table."
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"PASTE_REFRESH_TOKEN_HERE\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "refresh"]
+            }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "logout"]
+            }
+          }
+        },
+        {
+          "name": "Employees (Admin)",
+          "item": [
+            {
+              "name": "Add Employee",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Jane Smith\",\n  \"email\": \"jane@company.com\",\n  \"phone\": \"+1234567890\",\n  \"department\": \"Engineering\",\n  \"position\": \"Developer\",\n  \"hire_date\": \"2024-01-15\",\n  \"allowed_latitude\": 25.2048,\n  \"allowed_longitude\": 55.2708,\n  \"allowed_location_radius\": 500\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/employees",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth", "employees"]
+                }
+              }
+            },
+            {
+              "name": "Get All Employees",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/employees",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth", "employees"]
+                }
+              }
+            },
+            {
+              "name": "Delete Employee",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  { "key": "Authorization", "value": "Bearer {{token}}" }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/employees/2",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "auth", "employees", "2"]
+                },
+                "description": "Change the ID in the URL as needed."
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users"]
+            },
+            "description": "Admin only. Returns all employees ordered by name."
+          }
+        },
+        {
+          "name": "Get User by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "1"]
+            },
+            "description": "Admin only. Change the ID in the URL."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Attendance",
+      "item": [
+        {
+          "name": "Check In",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 25.2048,\n  \"longitude\": 55.2708,\n  \"accuracy\": 10\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/attendance/checkin",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "attendance", "checkin"]
+            },
+            "description": "Employee checks in. employee_id is derived from JWT — no need to pass it. GPS coordinates are optional. Admins can pass employee_id to check in on behalf of an employee."
+          }
+        },
+        {
+          "name": "Check Out",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 25.2048,\n  \"longitude\": 55.2708,\n  \"accuracy\": 10\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/attendance/checkout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "attendance", "checkout"]
+            },
+            "description": "Employee checks out. Must have an open check-in session first."
+          }
+        },
+        {
+          "name": "Get Attendance (all / filtered)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/attendance?from_date=2024-01-01&to_date=2024-12-31",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "attendance"],
+              "query": [
+                { "key": "from_date", "value": "2024-01-01", "description": "Optional YYYY-MM-DD" },
+                { "key": "to_date",   "value": "2024-12-31", "description": "Optional YYYY-MM-DD" },
+                { "key": "employee_id", "value": null, "disabled": true, "description": "Admin only: filter by employee" }
+              ]
+            },
+            "description": "Employees see their own records only. Admins see all. Supports from_date, to_date, employee_id query params."
+          }
+        },
+        {
+          "name": "Get Today's Attendance",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/attendance/today",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "attendance", "today"]
+            }
+          }
+        },
+        {
+          "name": "Get Employee Current Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/attendance/status/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "attendance", "status", "1"]
+            },
+            "description": "Returns whether an employee is currently checked in. Change the employee ID in the URL."
+          }
+        },
+        {
+          "name": "Get All Active Employees",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/attendance/employees",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "attendance", "employees"]
+            }
+          }
+        },
+        {
+          "name": "Get Attendance Statistics",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/attendance/statistics",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "attendance", "statistics"]
+            }
+          }
+        },
+        {
+          "name": "Get User Attendance History (paginated)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/attendance/user/1?limit=20&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "attendance", "user", "1"],
+              "query": [
+                { "key": "limit",  "value": "20" },
+                { "key": "offset", "value": "0" }
+              ]
+            },
+            "description": "Paginated history for one employee. Employees can only access their own. Change the ID in the URL."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports (Admin only)",
+      "item": [
+        {
+          "name": "Get Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/summary",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reports", "summary"]
+            },
+            "description": "System-wide snapshot: total employees, total records, today's check-ins, currently checked in."
+          }
+        },
+        {
+          "name": "Get User Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/user/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reports", "user", "1"]
+            },
+            "description": "Lifetime attendance statistics for one employee. Change the ID in the URL."
+          }
+        },
+        {
+          "name": "Export Excel",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/excel?from_date=2024-01-01&to_date=2024-12-31&scope=all",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reports", "excel"],
+              "query": [
+                { "key": "from_date",   "value": "2024-01-01" },
+                { "key": "to_date",     "value": "2024-12-31" },
+                { "key": "scope",       "value": "all",        "description": "all | page" },
+                { "key": "employee_id", "value": null,         "disabled": true, "description": "Filter by employee" },
+                { "key": "limit",       "value": null,         "disabled": true, "description": "Required when scope=page" },
+                { "key": "offset",      "value": null,         "disabled": true }
+              ]
+            },
+            "description": "Downloads an .xlsx file. In Postman: Save Response → Save to File."
+          }
+        },
+        {
+          "name": "Export PDF",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{token}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/pdf?from_date=2024-01-01&to_date=2024-12-31&scope=all",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reports", "pdf"],
+              "query": [
+                { "key": "from_date",   "value": "2024-01-01" },
+                { "key": "to_date",     "value": "2024-12-31" },
+                { "key": "scope",       "value": "all",        "description": "all | page" },
+                { "key": "employee_id", "value": null,         "disabled": true },
+                { "key": "limit",       "value": null,         "disabled": true },
+                { "key": "offset",      "value": null,         "disabled": true }
+              ]
+            },
+            "description": "Downloads a .pdf file. In Postman: Save Response → Save to File."
+          }
+        }
+      ]
+    }
+  ]
+}

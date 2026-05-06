@@ -17,8 +17,41 @@ require('dotenv').config();
 const app    = require('./server/app');
 const db     = require('./server/config/database');
 const logger = require('./server/utils/logger');
+const bcrypt = require('bcryptjs');
 
 const PORT = process.env.PORT || 3000;
+
+async function bootstrapAdmin() {
+  const [[{ adminCount }]] = await db.query(
+    `SELECT COUNT(*) AS adminCount
+     FROM users u JOIN roles r ON u.role_id = r.id
+     WHERE r.name = 'admin' AND u.is_active = 1`
+  );
+  if (Number(adminCount) > 0) return;
+
+  const email    = process.env.ADMIN_EMAIL    || 'admin@company.com';
+  const password = process.env.ADMIN_PASSWORD || 'Admin@1234';
+  const hash     = await bcrypt.hash(password, 12);
+
+  const [[{ roleId }]] = await db.query(
+    `SELECT id AS roleId FROM roles WHERE name = 'admin' LIMIT 1`
+  );
+  if (!roleId) { logger.warn('Bootstrap: "admin" role not found in roles table — skipping'); return; }
+
+  const [empResult] = await db.query(
+    `INSERT INTO employees (name, email, status) VALUES ('System Admin', ?, 'active')`,
+    [email]
+  );
+  const empId = empResult.insertId;
+
+  await db.query(
+    `INSERT INTO users (employee_id, username, email, password_hash, role_id, is_active)
+     VALUES (?, 'admin', ?, ?, ?, 1)`,
+    [empId, email, hash, roleId]
+  );
+
+  logger.info(`Bootstrap: default admin created — email=${email} (change the password immediately)`);
+}
 
 // Test database connection before starting server
 async function startServer() {
@@ -27,6 +60,8 @@ async function startServer() {
     const connection = await db.getConnection();
     await connection.query('SELECT 1');
     connection.release();
+
+    await bootstrapAdmin();
 
     // Start the server
     const server = app.listen(PORT, () => {
