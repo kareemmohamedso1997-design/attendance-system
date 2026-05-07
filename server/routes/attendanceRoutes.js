@@ -1,67 +1,42 @@
-/**
- * Attendance Routes
- */
-
 const express = require('express');
 const { validateCheckInOut, validateEmployeeIdParam } = require('../middleware/validationMiddleware');
-const { attendanceLimiter } = require('../middleware/rateLimitMiddleware');
-const { authenticateToken, isEmployee, canAccessEmployeeData } = require('../middleware/authMiddleware');
-const attendanceController = require('../controllers/attendanceController');
-
+const { attendanceLimiter }    = require('../middleware/rateLimitMiddleware');
+const {
+  authenticateToken,
+  canAccessEmployeeData,
+}                              = require('../middleware/authMiddleware');
+const authorizeRole            = require('../middleware/authorizeRole');
+const attendanceController     = require('../controllers/attendanceController');
 
 const router = express.Router();
 
-/**
- * All attendance routes require authentication
- */
+// Every attendance endpoint requires a valid access token
 router.use(authenticateToken);
 
-/**
- * POST /api/attendance/checkin
- * Employee checks in with optional GPS location
- */
-router.post('/checkin', attendanceLimiter, validateCheckInOut, attendanceController.checkIn);
+// POST /api/attendance/checkin  — all authenticated employees
+router.post('/checkin',  attendanceLimiter, validateCheckInOut, attendanceController.checkIn);
 
-/**
- * POST /api/attendance/checkout
- * Employee checks out with optional GPS location
- */
+// POST /api/attendance/checkout — all authenticated employees
 router.post('/checkout', attendanceLimiter, validateCheckInOut, attendanceController.checkOut);
 
-/**
- * GET /api/attendance
- * Get attendance records (employees see own, admins see all)
- */
+// GET /api/attendance — employees see own records; admins see all (scoped in controller)
 router.get('/', attendanceController.getAttendance);
 
-/**
- * GET /api/attendance/today
- * Get today's attendance records
- */
+// GET /api/attendance/today — employees see own; admins see all (scoped in controller)
 router.get('/today', attendanceController.getTodayAttendance);
 
-/**
- * GET /api/attendance/status/:employeeId
- * Get current status of an employee
- */
+// GET /api/attendance/status/:employeeId — self or admin
 router.get('/status/:employeeId', validateEmployeeIdParam, canAccessEmployeeData, attendanceController.getCurrentStatus);
 
-/**
- * GET /api/employees
- * Get list of all active employees
- */
-router.get('/employees', attendanceController.getEmployees);
+// GET /api/attendance/employees — admin and manager only
+// Exposes the full active-employee list; employees must not enumerate other users.
+router.get('/employees', authorizeRole(['admin', 'manager']), attendanceController.getEmployees);
 
-/**
- * GET /api/attendance/statistics
- * Get attendance statistics
- */
-router.get('/statistics', attendanceController.getStatistics);
+// GET /api/attendance/statistics — admin and manager only
+// Aggregated stats; employee-scoped stats are delivered via /user/:id instead.
+router.get('/statistics', authorizeRole(['admin', 'manager']), attendanceController.getStatistics);
 
-/**
- * GET /api/attendance/user/:id
- * Paginated history for one employee (own data or admin)
- */
+// GET /api/attendance/user/:id — self or admin (ownership enforced in controller)
 router.get('/user/:id', attendanceController.getUserAttendance);
 
 module.exports = router;
